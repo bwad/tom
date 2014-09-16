@@ -54,6 +54,31 @@ Currently expected to be found in `$CATALINA_HOME/deployer` which is not starnda
       -n    Specify number of lines to show in 'logs' commmand.
 
 
+##Generated Project Structure
+    <name>/
+        ├── build
+        │   ├── classes
+        │   │   └── main
+        │   │       └── ExampleServlet.class
+        │   ├── dependency-cache
+        │   ├── libs
+        │   │   └── blue.war
+        │   └── tmp
+        │       ├── compileJava
+        │       └── war
+        │           └── MANIFEST.MF
+        ├── build.gradle
+        ├── build.xml
+        ├── src
+        │   └── main
+        │       ├── java
+        │       │   └── ExampleServlet.java
+        │       └── webapp
+        │           ├── WEB-INF
+        │           │   └── web.xml
+        │           └── index.jsp
+        └── tomcat-tasks.xml
+
 ##Workflow
 ###Gradle+Ant
 The Gradle build flow works with the Ant based deploy task in the following steps:

@@ -36,7 +36,7 @@ USAGE
 
 #=============================================================================
 #
-# new Command.
+# deploy Command.
 #
 function tom_cmd_deploy {
   
@@ -118,7 +118,7 @@ SERVLET
 
 #=============================================================================
 #
-# new Command.
+# logs Command.
 #
 function tom_cmd_logs {
   local logs_n=20 # default
@@ -528,7 +528,7 @@ GRADLEDEPLOY
 }
 #=============================================================================
 #
-# new Command.
+# start Command.
 #
 function tom_cmd_start {
   
