@@ -149,7 +149,7 @@ function tom_cmd_new {
   mkdir -p ${name}/src/main/webapp/WEB-INF
   tom_new_webxml ${name}/src/main/webapp/WEB-INF/web.xml
   tom_new_indexjsp "${name}/src/main/webapp/index.jsp" "${name}"
-  tom_new_buildxml "${name}/build.xml" "${name}"
+  #FORNOW: tom_new_buildxml "${name}/build.xml" "${name}"
   tom_new_buildgradle "${name}/build.gradle" "${name}"
   #FORNOW: tom_new_pomxml "${name}/pom.xml" "${name}"
   tom_new_tomcattasks "${name}/tomcat-tasks.xml"  "${name}"

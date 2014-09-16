@@ -68,7 +68,6 @@ Currently expected to be found in `$CATALINA_HOME/deployer` which is not starnda
         │       └── war
         │           └── MANIFEST.MF
         ├── build.gradle
-        ├── build.xml
         ├── src
         │   └── main
         │       ├── java
