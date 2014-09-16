@@ -47,6 +47,7 @@ function tom_cmd_deploy {
   echo "Deploying ..."
   # ant -lib $deployer_lib -lib $tomcat_lib clean compile deploy
   gradle --daemon deploy
+  open http://localhost:8080/${PWD##*/}  #TBD: make configurable.
 }
 
 
@@ -95,22 +96,25 @@ function servlet {
   printf -- "Creating $dstpath...\n"
     
     cat > "${dstpath}"<<SERVLET
-import java.io.*;
-import javax.servlet.*;
-import javax.servlet.http.*;
+import java.io.IOException;
+import java.io.PrintWriter;
 
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.ServletException;
+
+@WebServlet("/${name}")
 public class ${sname} extends HttpServlet {
-  public void doGet(HttpServletRequest request, 
-         HttpServletResponse response)
-        throws ServletException, IOException
-  {
-    response.setContentType("text/html");
-    PrintWriter out = response.getWriter();
 
-    out.println("<title>${name}</title>" + "<body bgcolor=FFFFFF>");
-    out.println("<h2>Hello ${name}</h2>");
-    out.close();
-  }
+    @Override
+    public void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        PrintWriter out = response.getWriter();
+        out.println("... ${sname} is working ...");
+        out.close();
+    }
 }
 SERVLET
 }
@@ -163,26 +167,14 @@ function tom_new_webxml {
   printf -- "Creating $dstpath...\n"
     
     cat > ${dstpath}<<WEBXML
-<!DOCTYPE web-app PUBLIC
- "-//Sun Microsystems, Inc.//DTD Web Application 2.3//EN"
- "http://java.sun.com/dtd/web-app_2_3.dtd" >
-
-<web-app>
-
-  <display-name>Archetype Created Web Application</display-name>
-
-  <servlet>
-   <servlet-name>example</servlet-name>
-   <servlet-class>ExampleServlet</servlet-class>
-  </servlet>
-
-  <servlet-mapping>
-     <servlet-name>example</servlet-name>
-     <url-pattern>/example</url-pattern>
-  </servlet-mapping>
-    
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns="http://xmlns.jcp.org/xml/ns/javaee"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee 
+            http://xmlns.jcp.org/xml/ns/javaee/web-app_3_1.xsd"
+         version="3.1">
+  <display-name>tom Created Web Application</display-name>
 </web-app>
-
 WEBXML
 
 }
@@ -235,8 +227,8 @@ repositories {
 }
 
 dependencies {
-   providedCompile 'javax.servlet:servlet-api:2.5'
-   runtime 'javax.servlet:jstl:1.1.2'
+  providedCompile 'javax.servlet:javax.servlet-api:3.1.0'
+  runtime 'javax.servlet:jstl:1.2'
 }
 BUILDGRADLE
 }
@@ -298,31 +290,25 @@ function tom_new_servlet {
   printf -- "Creating $dstpath...\n"
   
   cat > ${dstpath}<<SERVLET
-import java.io.*;
-import javax.servlet.*;
-import javax.servlet.http.*;
+import java.io.IOException;
+import java.io.PrintWriter;
 
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.ServletException;
+
+@WebServlet("/example")
 public class ExampleServlet extends HttpServlet {
-  public void doGet(HttpServletRequest request, 
-         HttpServletResponse response)
-        throws ServletException, IOException
-  {
-    response.setContentType("text/html");
-    PrintWriter out = response.getWriter();
 
-    out.println("<title>Example</title>" + "<body bgcolor=FFFFFF>");
-    out.println("<h2>Button Clicked</h2>");
-
-    String DATA = request.getParameter("DATA");
-    if(DATA != null){
-      out.println(DATA);
-    } else {
-      out.println("No text entered.");
+    @Override
+    public void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        PrintWriter out = response.getWriter();
+        out.println("... your example servlet is working ...");
+        out.close();
     }
-
-    out.println("<P>Return to <A HREF='../simpleHTML.html'>Form</A>");
-    out.close();
-  }
 }
 SERVLET
 }

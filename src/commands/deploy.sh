@@ -12,5 +12,6 @@ function tom_cmd_deploy {
   echo "Deploying ..."
   # ant -lib $deployer_lib -lib $tomcat_lib clean compile deploy
   gradle --daemon deploy
+  open http://localhost:8080/${PWD##*/}  #TBD: make configurable.
 }
 
