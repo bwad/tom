@@ -1,0 +1,583 @@
+#!/usr/bin/env bash
+
+function tom_usage {
+
+    cat <<'USAGE'
+
+Simple cli tool for working with Tomcat in a development environment.
+
+Usage:
+
+  tom [command] [command parameters] [options] 
+
+Commands:
+
+  new <name>      - Create new project.
+  start           - Start Tomcat server.
+  stop            - Stop Tomcat server.
+  logs [ -n <#>]  - Display <#> lines from tail of logs/catalina.out
+  deploy          - Deploy webapp to server. (depends on build)
+  build           - Build webapp
+  generate        - (Work in progress!)
+  
+Options:
+
+  -h    Display this message and exit.
+  -n    Specify number of lines to show in 'logs' commmand.
+
+USAGE
+    
+}
+
+#
+# utils.sh
+#
+
+
+#=============================================================================
+#
+# new Command.
+#
+function tom_cmd_deploy {
+  
+  # Both libs are required because the deployer needs a couple of libs not in tomcat8.
+  local deployer_lib=$CATALINA_HOME/deployer/lib
+  local tomcat_lib=$CATALINA_HOME/lib
+  
+  echo "Deploying ..."
+  # ant -lib $deployer_lib -lib $tomcat_lib clean compile deploy
+  gradle --daemon deploy
+}
+
+
+#=============================================================================
+#
+# generate Command.
+#
+function tom_cmd_generate {
+  
+  # Command parrameters
+  local what=$1;shift
+  local name=$1;shift
+    
+  # Handle options
+  local tmpl=""
+  while getopts "t:"  TOMOPT
+  do
+    case $TOMOPT in
+      t)tmpl=$OPTARG;;
+    esac
+  done
+  
+  printf --  "\n====================\n"
+  printf --   "what: $what\n"
+  printf --   "name: $name\n"
+  printf --   "template: $tmpl\n"
+  printf --   "====================\n\n"
+  
+  case $what in
+  servlet)   
+    printf -- "Generating Servlet ${name}...\n\n" 
+    servlet "${name}"
+    ;;
+  esac
+}
+
+#=============================================================================
+# generate servlet 
+#=============================================================================
+function servlet {
+
+  local name=$1
+  local sname="${name^}Servlet"
+  local dstpath="src/main/java/${sname}.java"
+  
+  printf -- "Creating $dstpath...\n"
+    
+    cat > "${dstpath}"<<SERVLET
+import java.io.*;
+import javax.servlet.*;
+import javax.servlet.http.*;
+
+public class ${sname} extends HttpServlet {
+  public void doGet(HttpServletRequest request, 
+         HttpServletResponse response)
+        throws ServletException, IOException
+  {
+    response.setContentType("text/html");
+    PrintWriter out = response.getWriter();
+
+    out.println("<title>${name}</title>" + "<body bgcolor=FFFFFF>");
+    out.println("<h2>Hello ${name}</h2>");
+    out.close();
+  }
+}
+SERVLET
+}
+
+
+#=============================================================================
+#
+# new Command.
+#
+function tom_cmd_logs {
+  local logs_n=20 # default
+  
+  while getopts "n:"  TOMOPT
+  do
+    case $TOMOPT in
+      n)logs_n=$OPTARG;;
+    esac
+  done
+  
+  echo "Tomcat logs (catalina.out): ( -n $logs_n)"
+  tail -n $logs_n $CATALINA_HOME/logs/catalina.out
+  echo "(last $logs_n entries of catalina.out shown)"
+}
+
+
+#=============================================================================
+#
+# new Command.
+#
+function tom_cmd_new {
+  
+  local name=$1; shift  # app name
+  
+  echo "Creating new project \${name} ..."
+  mkdir -p ${name}/src/main/java
+  mkdir -p ${name}/src/main/webapp/WEB-INF
+  tom_new_webxml ${name}/src/main/webapp/WEB-INF/web.xml
+  tom_new_indexjsp "${name}/src/main/webapp/index.jsp" "${name}"
+  tom_new_buildxml "${name}/build.xml" "${name}"
+  tom_new_buildgradle "${name}/build.gradle" "${name}"
+  #FORNOW: tom_new_pomxml "${name}/pom.xml" "${name}"
+  tom_new_tomcattasks "${name}/tomcat-tasks.xml"  "${name}"
+  tom_new_servlet "${name}/src/main/java/ExampleServlet.java"  "${name}"
+}
+
+function tom_new_webxml {
+    
+  local dstpath=$1
+  
+  printf -- "Creating $dstpath...\n"
+    
+    cat > ${dstpath}<<WEBXML
+<!DOCTYPE web-app PUBLIC
+ "-//Sun Microsystems, Inc.//DTD Web Application 2.3//EN"
+ "http://java.sun.com/dtd/web-app_2_3.dtd" >
+
+<web-app>
+
+  <display-name>Archetype Created Web Application</display-name>
+
+  <servlet>
+   <servlet-name>example</servlet-name>
+   <servlet-class>ExampleServlet</servlet-class>
+  </servlet>
+
+  <servlet-mapping>
+     <servlet-name>example</servlet-name>
+     <url-pattern>/example</url-pattern>
+  </servlet-mapping>
+    
+</web-app>
+
+WEBXML
+
+}
+
+
+function tom_new_indexjsp {
+    
+  local dstpath=$1
+  local name=$2
+    
+  printf -- "Creating $dstpath...\n"
+    
+  cat > ${dstpath}<<INDEXJSP
+<html>
+<body>
+<h2>Hello ${name}!</h2>
+</body>
+</html>
+INDEXJSP
+
+}
+
+function tom_new_buildgradle {
+  
+  local dstpath=$1
+  local name=$2
+
+  printf -- "Creating $dstpath...\n"
+  
+  cat > ${dstpath}<<BUILDGRADLE
+apply plugin: 'java'
+apply plugin: 'war'
+
+// Ant configuration needs to be done before import or it will fail.
+ant.properties.build = "./build"
+ant.properties.username = "brant"
+ant.properties.password="scala"
+ant.properties.webapp = "${name}"
+ant.properties.path = "/${name}"
+ant.properties.url = "http://localhost:8080/manager/text"
+ant.properties.'webapp.path' = "build/libs/${name}"
+ant.properties.tomcat="\${System.getenv('CATALINA_HOME')}"
+
+ant.importBuild 'tomcat-tasks.xml'
+
+deploy.dependsOn build
+
+repositories {
+   mavenCentral()
+}
+
+dependencies {
+   providedCompile 'javax.servlet:servlet-api:2.5'
+   runtime 'javax.servlet:jstl:1.1.2'
+}
+BUILDGRADLE
+}
+
+function tom_new_pomxml {
+  
+  local dstpath=$1
+  local name=$2
+
+  printf -- "Creating $dstpath...\n"
+  
+  cat > ${dstpath}<<POMXML
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.acme</groupId>
+  <artifactId>my-webapp</artifactId>
+  <packaging>war</packaging>
+  <version>1.0-SNAPSHOT</version>
+  <name>my-webapp Maven Webapp</name>
+  <url>http://maven.apache.org</url>
+  <dependencies>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>3.8.1</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+    	<groupId>org.apache.tomcat</groupId>
+    	<artifactId>tomcat-servlet-api</artifactId>
+    	<version>8.0.12</version>
+    </dependency>
+  </dependencies>
+  <build>
+    <finalName>my-webapp</finalName>
+     <plugins>
+       <plugin>
+         <groupId>org.codehaus.mojo</groupId>
+         <artifactId>tomcat-maven-plugin</artifactId>
+         <configuration>
+             <url>http://localhost:8080/manager/html</url>
+             <server>mytomcat</server>
+             <path>/my-app</path>
+         </configuration>
+       </plugin>
+     </plugins>
+   </build>
+</project>
+
+POMXML
+}
+
+function tom_new_servlet {
+  
+  local dstpath=$1
+  local name=$2
+
+  printf -- "Creating $dstpath...\n"
+  
+  cat > ${dstpath}<<SERVLET
+import java.io.*;
+import javax.servlet.*;
+import javax.servlet.http.*;
+
+public class ExampleServlet extends HttpServlet {
+  public void doGet(HttpServletRequest request, 
+         HttpServletResponse response)
+        throws ServletException, IOException
+  {
+    response.setContentType("text/html");
+    PrintWriter out = response.getWriter();
+
+    out.println("<title>Example</title>" + "<body bgcolor=FFFFFF>");
+    out.println("<h2>Button Clicked</h2>");
+
+    String DATA = request.getParameter("DATA");
+    if(DATA != null){
+      out.println(DATA);
+    } else {
+      out.println("No text entered.");
+    }
+
+    out.println("<P>Return to <A HREF='../simpleHTML.html'>Form</A>");
+    out.close();
+  }
+}
+SERVLET
+}
+
+function tom_new_buildxml {
+  
+  local dstpath=$1
+  local name=$2
+
+  printf -- "Creating $dstpath...\n"
+  
+  cat > ${dstpath}<<BUILDXML
+<?xml version='1.0' encoding='utf-8'?>
+<!--
+  Licensed to the Apache Software Foundation (ASF) under one or more
+  contributor license agreements.  See the NOTICE file distributed with
+  this work for additional information regarding copyright ownership.
+  The ASF licenses this file to You under the Apache License, Version 2.0
+  (the "License"); you may not use this file except in compliance with
+  the License.  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+<project name="Deployer" default="compile" basedir=".">
+
+  <property file="deployer.properties"/>
+
+  <!-- Configure the directory into which the web application is built -->
+  <property name="build"    value="\${basedir}/build"/>
+
+  <!-- Configure the folder and context path for this application -->
+  <property name="webapp"   value="${name}"/>
+  <property name="path"     value="/${name}"/>
+
+  <!-- Configure properties to access the Manager application -->
+  <property name="url"      value="http://localhost:8080/manager/text"/>
+  <property name="username" value="brant"/>
+  <property name="password" value="scala"/>
+
+  <property name="webapp.path"     value="\${build}/webapp\${path}"/>
+
+  <path id="deployer.classpath">
+    <fileset dir="/usr/local/tomcat/8.0.12/deployer/lib">
+      <include name="*.jar"/>
+    </fileset>
+  </path>
+
+  <!-- Configure the custom Ant tasks for the Manager application -->
+  <taskdef resource="org/apache/catalina/ant/catalina.tasks"
+           classpathref="deployer.classpath"/>
+
+  <!-- Executable Targets -->
+  <target name="clean" description="Removes build directory">
+    <delete dir="\${build}" />
+  </target>
+
+  <target name="compile" description="Compile web application"
+          depends="clean">
+
+    <copy todir="\${webapp.path}">
+      <fileset dir="\${webapp}" />
+    </copy>
+
+    <jasper validateXml="false"
+             uriroot="\${webapp.path}"
+             webXmlFragment="\${webapp.path}/WEB-INF/generated_web.xml"
+             addWebXmlMappings="true"
+             outputDir="\${webapp.path}/WEB-INF/classes" />
+
+    <validator path="\${webapp.path}" />
+
+    <mkdir dir="\${webapp.path}/WEB-INF/classes"/>
+    <mkdir dir="\${webapp.path}/WEB-INF/lib"/>
+
+    <javac destdir="\${webapp.path}/WEB-INF/classes"
+           optimize="off"
+           debug="\${compile.debug}"
+           deprecation="\${compile.deprecation}"
+           failonerror="false"
+           srcdir="\${webapp.path}/WEB-INF/classes"
+           encoding="UTF-8"
+           excludes="**/*.smap">
+      <classpath>
+        <fileset dir="\${webapp.path}/WEB-INF/lib">
+          <include name="*.jar"/>
+        </fileset>
+        <fileset dir="/usr/local/tomcat/8.0.12/deployer/lib">
+          <include name="*.jar"/>
+        </fileset>
+      </classpath>
+      <include name="**" />
+      <exclude name="tags/**" />
+    </javac>
+
+    <jar destfile="\${webapp.path}.war"
+         basedir="\${webapp.path}" />
+
+  </target>
+
+  <target name="deploy" description="Deploy web application">
+    <deploy url="\${url}" username="\${username}" password="\${password}"
+            path="\${path}" war="\${webapp.path}.war" update="true" />
+  </target>
+
+  <target name="undeploy" description="Undeploy web application">
+    <undeploy url="\${url}" username="\${username}" password="\${password}"
+              path="\${path}"/>
+  </target>
+
+  <!-- Webapp lifecycle control -->
+  <target name="start" description="Start web application">
+    <start url="\${url}" username="\${username}" password="\${password}"
+           path="\${path}"/>
+  </target>
+  <target name="reload" description="Reload web application">
+    <reload url="\${url}" username="\${username}" password="\${password}"
+            path="\${path}"/>
+  </target>
+  <target name="stop" description="Stop web application">
+    <stop url="\${url}" username="\${username}" password="\${password}"
+          path="\${path}"/>
+  </target>
+
+</project>
+
+BUILDXML
+
+}
+
+function tom_new_tomcattasks {
+  
+  local dstpath=$1
+  local name=$2
+
+  printf -- "Creating $dstpath...\n"
+  
+  cat > ${dstpath}<<GRADLEDEPLOY
+<?xml version='1.0' encoding='utf-8'?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one or more
+contributor license agreements.  See the NOTICE file distributed with
+this work for additional information regarding copyright ownership.
+The ASF licenses this file to You under the Apache License, Version 2.0
+(the "License"); you may not use this file except in compliance with
+the License.  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<project name="Deployer" default="deploy" basedir=".">
+
+  <path id="deployer.classpath">
+    <fileset dir="\${tomcat}/deployer/lib">
+      <include name="*.jar"/>
+    </fileset>
+    <fileset dir="\${tomcat}/lib">
+      <include name="*.jar"/>
+    </fileset>
+  </path>
+
+  <!-- Configure the custom Ant tasks for the Manager application -->
+  <taskdef resource="org/apache/catalina/ant/catalina.tasks"
+           classpathref="deployer.classpath"/>
+
+  <target name="deploy" description="Deploy web application">
+    <deploy url="\${url}" username="\${username}" password="\${password}"
+            path="\${path}" war="\${webapp.path}.war" update="true" />
+  </target>
+
+  <target name="undeploy" description="Undeploy web application">
+    <undeploy url="\${url}" username="\${username}" password="\${password}"
+              path="\${path}"/>
+  </target>
+
+  <!-- Webapp lifecycle control -->
+  <target name="start" description="Start web application">
+    <start url="\${url}" username="\${username}" password="\${password}"
+           path="\${path}"/>
+  </target>
+  <target name="reload" description="Reload web application">
+    <reload url="\${url}" username="\${username}" password="\${password}"
+            path="\${path}"/>
+  </target>
+  <target name="stop" description="Stop web application">
+    <stop url="\${url}" username="\${username}" password="\${password}"
+          path="\${path}"/>
+  </target>
+
+</project>
+
+GRADLEDEPLOY
+}
+#=============================================================================
+#
+# new Command.
+#
+function tom_cmd_start {
+  
+  echo "Starting ..."
+  $CATALINA_HOME/bin/catalina.sh start
+  
+}
+
+
+#=============================================================================
+#
+# stop Command.
+#
+function tom_cmd_stop {
+    
+  echo "Stopping ..."
+  $CATALINA_HOME/bin/catalina.sh stop
+  
+}
+
+
+#=============================================================================
+#
+#   Main
+#
+#   Possible enchancements:
+#       - 
+#=============================================================================
+
+#
+# Handle lone -h option
+# 
+if [[ $1 == "-h" || $# -eq 0 ]]; then tom_usage; exit 0; fi
+
+CMD=$1; shift
+case $CMD in
+
+  new) tom_cmd_new "$@" ;;
+  start) tom_cmd_start "$@" ;;
+  stop) tom_cmd_stop "$@" ;;
+  logs) tom_cmd_logs "$@" ;;
+  deploy) tom_cmd_deploy "$@" ;;
+  g|ge|gen|gene|gener|genra|generat|generate) tom_cmd_generate "$@" ;;
+  
+  # Extras:  (may be temporary)
+  build) gradle --daemon build ;;
+  
+    
+  *) printf -- "ERROR: Unknown command $CMD\n"
+    ;;
+esac
+
